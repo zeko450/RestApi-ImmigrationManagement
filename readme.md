@@ -1,6 +1,7 @@
-npm init
-npm i express mongoose
-npm i --save-dev dotenv nodemon
-npm install bcrypt
+### npm init
+### npm i nodemon
+### npm i express mongoose
+### npm i dotenv
+### npm i bcrypt
 
 
