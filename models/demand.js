@@ -2,7 +2,6 @@ const mongoose = require('mongoose')
 
 const demandSchema = new mongoose.Schema({
 
-
     NumeroDeDemande: {
         type: Number,
         required: true,
@@ -60,5 +59,4 @@ const demandSchema = new mongoose.Schema({
         default: Date.now
     }
 })
-
 module.exports = mongoose.model('Demand', demandSchema)
