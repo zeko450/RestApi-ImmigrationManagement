@@ -1,6 +1,5 @@
 const mongoose = require('mongoose');
 
-
 const bugSchema = new mongoose.Schema({
 
     NumeroDeBug: {
