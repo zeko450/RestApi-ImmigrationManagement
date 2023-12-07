@@ -24,7 +24,4 @@ const bugSchema = new mongoose.Schema({
         default: Date.now
     }
 });
-
-const Bug = mongoose.model('Bug', bugSchema);
-
-module.exports = Bug;
+module.exports = mongoose.model('Bug', bugSchema)
