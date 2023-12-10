@@ -1,7 +1,7 @@
-npm init
-npm i express mongoose
-npm i --save-dev dotenv nodemon
-
-comment envoyer un lien pour reintialiser mdp
-
+### npm init
+### npm i nodemon
+### npm i express mongoose
+### npm i dotenv
+### npm i bcrypt
+Don't forget to add your own database authentification in Server.js file  
 
