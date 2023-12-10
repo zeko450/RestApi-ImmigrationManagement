@@ -5,7 +5,7 @@ const bcrypt = require('bcrypt'); //Password crypter
 const saltRounds = 10; //Intensity of crypting
 
 
-//GET Accounts    ---Fonctionnel
+//GET Accounts
 router.get('/getAll', async (req, res) => {
     try {
         const accounts = await Account.find();
@@ -16,7 +16,7 @@ router.get('/getAll', async (req, res) => {
     }
 });
 
-//GET verifyAccounts   ---Fonctionnel
+//GET verifyAccounts
 router.get('/verify', verifyUser, async (req, res) => {
     try {
         res.json(res.userFound);
@@ -26,7 +26,7 @@ router.get('/verify', verifyUser, async (req, res) => {
     }
 })
 
-//POST addNewAccount   ---Fonctionnel  à optimiser
+//POST addNewAccount
 router.post('/post', async (req, res) => {
     try {
         const plaintextPassword = req.body.password;
@@ -52,12 +52,12 @@ router.post('/post', async (req, res) => {
     };
 });
 
-//GET oneAccountById 
+//GET Account by id 
 router.get('/:id', getAccount, (req, res) => {
     res.json(res.account);
 });
 
-//Update Password  
+//Update account password by id  
 router.patch('/update/:id', getAccount, async (req, res) => {
     const plainText = req.body.password
 
@@ -80,7 +80,8 @@ router.patch('/update/:id', getAccount, async (req, res) => {
         res.status(400).json({ error: 'New password is required for update' });
     }
 });
-//Delete oneAccount
+
+//Delete Account by id
 router.delete('/:id', getAccount, async (req, res) => {
     try {
         await res.account.deleteOne();
@@ -91,7 +92,7 @@ router.delete('/:id', getAccount, async (req, res) => {
 })
 
 //==========================================================================
-//Méthode crypte un mot de passe   --fonctionnel
+//Promise based structure 
 async function cryptPassword(plaintextPassword) {
     return new Promise((resolve, reject) => {
         bcrypt.hash(plaintextPassword, saltRounds, function (err, hash) {
@@ -108,7 +109,7 @@ async function cryptPassword(plaintextPassword) {
 
 //============================================================================
 //Middleware function 
-//Méthode retourne un compte  --fonctionnel
+//Get Account
 async function getAccount(req, res, next) {
     let account;
     try {
@@ -123,7 +124,7 @@ async function getAccount(req, res, next) {
     next();
 }
 
-//Methode authentifie un utilisateur et retourne une booleene --fonctionnel
+// Authentify user returns a boolean if matches.
 async function verifyUser(req, res, next) {
     try {
         const accounts = await Account.find();
