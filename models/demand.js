@@ -6,7 +6,7 @@ const demandSchema = new mongoose.Schema({
     NumeroDeDemande: {
         type: Number,
         required: true,
-        startAt: 1, 
+        startAt: 1,
         incrementBy: 1,
         unique: true
     },
@@ -34,7 +34,7 @@ const demandSchema = new mongoose.Schema({
         type: String,
         required: true
     },
-    DatedeNaissance: {
+    DateDeNaissance: {
         type: Date,
         required: true
     },
@@ -51,9 +51,13 @@ const demandSchema = new mongoose.Schema({
     },
     NumeroDeConfirmation: {
         type: Number,
-        startAt: 1, 
+        startAt: 1,
         incrementBy: 1,
         unique: true
+    },
+    StatutDeDemande: {
+        type: Boolean,
+        default: true
     },
     Date: {
         type: Date,
