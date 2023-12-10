@@ -39,12 +39,9 @@ router.post('/post', async (req, res) => {
             Courriel: req.body.courriel,
             Password: hashkey
         })
-        console.log('Account before saving:', account);
-
         // Save the account after hash key is generated
         const newAccount = await account.save();
 
-        console.log('Account after saving:', newAccount);
         // Respond with the newly created account
         res.status(201).json(newAccount);
     }
@@ -81,86 +78,80 @@ router.patch('/update/:id', getAccount, async (req, res) => {
     } else {
         // Handle case where req.body.Password is null
         res.status(400).json({ error: 'New password is required for update' });
-  }
+    }
 });
-    //Delete oneAccount
-    router.delete('/:id', getAccount, async (req, res) => {
-        try {
-            await res.account.deleteOne();
-            res.json({ message: 'Compte supprimer' })
-        } catch (err) {
-            res.status(500).json({ message: err.message })
-        }
-    })
-
-
-
-    //Méthode retourne un compte  --fonctionnel
-    async function getAccount(req, res, next) {
-        let account;
-        try {
-            account = await Account.findById(req.params.id)
-            if (account == null) {
-                return res.status(404).json({ message: 'Compte introuvable' })
-            }
-        } catch (err) {
-            return res.status(500).json({ message: err.message })
-        }
-        res.account = account;
-        next();
+//Delete oneAccount
+router.delete('/:id', getAccount, async (req, res) => {
+    try {
+        await res.account.deleteOne();
+        res.json({ message: 'Compte supprimer' })
+    } catch (err) {
+        res.status(500).json({ message: err.message })
     }
+})
 
-    //Methode authentifie un utilisateur et retourne une booleene --fonctionnel
-    async function verifyUser(req, res, next) {
-        try {
-            const accounts = await Account.find();
-            var passwordFound = false;
-            var userFound = false;
-
-            for (let i = 0; i < accounts.length && !userFound; i++) {
-                const result = await bcrypt.compare(req.body.password, accounts[i].Password)
-
-                if (result) {
-                    passwordFound = true;
-                    console.log("password found " + passwordFound)
-
-                } else {
-                    console.log('Password is incorrect!');
-                }
-
-
-                if (accounts[i].Courriel === req.body.courriel && passwordFound) {
-                    userFound = true;
-                    console.log("user found : " + userFound);
-                }
-            }
-
-            if (!userFound) {
-                console.log("user found : " + userFound);
-                throw new Error('Utilisateur non trouvé')
+//==========================================================================
+//Méthode crypte un mot de passe   --fonctionnel
+async function cryptPassword(plaintextPassword) {
+    return new Promise((resolve, reject) => {
+        bcrypt.hash(plaintextPassword, saltRounds, function (err, hash) {
+            if (err) {
+                console.error('Error hashing password:', err);
+                reject(err);
             } else {
-                res.userFound = { "userFound": userFound };
-                next();
+                // Store the 'hash' in your database
+                resolve(hash);
+            }
+        });
+    });
+}
+
+//============================================================================
+//Middleware function 
+//Méthode retourne un compte  --fonctionnel
+async function getAccount(req, res, next) {
+    let account;
+    try {
+        account = await Account.findById(req.params.id)
+        if (account == null) {
+            return res.status(404).json({ message: 'Compte introuvable' })
+        }
+    } catch (err) {
+        return res.status(500).json({ message: err.message })
+    }
+    res.account = account;
+    next();
+}
+
+//Methode authentifie un utilisateur et retourne une booleene --fonctionnel
+async function verifyUser(req, res, next) {
+    try {
+        const accounts = await Account.find();
+        var passwordFound = false;
+        var userFound = false;
+
+        for (let i = 0; i < accounts.length && !userFound; i++) {
+            const result = await bcrypt.compare(req.body.password, accounts[i].Password)
+
+            if (result) {
+                passwordFound = true;
             }
 
-        } catch (err) {
-            console.log(err);
-            res.status(403).send("Erreur de connexion")
+            if (accounts[i].Courriel === req.body.courriel && passwordFound) {
+                userFound = true;
+            }
         }
-    }
 
-    //Méthode crypte un mot de passe   --fonctionnel
-    async function cryptPassword(plaintextPassword) {
-        return new Promise((resolve, reject) => {
-            bcrypt.hash(plaintextPassword, saltRounds, function (err, hash) {
-                if (err) {
-                    console.error('Error hashing password:', err);
-                    reject(err);
-                } else {
-                    // Store the 'hash' in your database
-                    resolve(hash);
-                }
-            });
-        });
+        if (!userFound) {
+            throw new Error('Utilisateur non trouvé')
+        } else {
+            res.userFound = { "userFound": userFound };
+            next();
+        }
+
+    } catch (err) {
+        res.status(403).send("Erreur de connexion")
     }
-    module.exports = router
+}
+
+module.exports = router
