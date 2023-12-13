@@ -153,5 +153,4 @@ async function verifyUser(req, res, next) {
         res.status(403).send("Erreur de connexion")
     }
 }
-
 module.exports = router
