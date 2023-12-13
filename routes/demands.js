@@ -18,11 +18,10 @@ router.get('/getAll/:id', getAccount, async (req, res) => {
         } else if (account.TypeDeCompte == "admin") {
             demands = await getDemandsForAdmin(openDemand);
         }
-        res.json(demands);
     } catch (err) {
         res.status(err.status || 500).json({ message: err.message });
     }
-});
+}); 
 
 //GET demands with filter par ordre decroissant
 router.get('/getDemandsWithFilter/:id', getAccount, async (req, res) => {
@@ -50,8 +49,34 @@ router.get('/getDemandsWithFilter/:id', getAccount, async (req, res) => {
     }
 })
 
+//Insert demand
+router.post('/post/:id', getAccount, async (req, res) => {
+    const demand = new Demand({
+        "NumeroDeDemande": req.body.numeroDeDemande, //Doit etre auto incrementes
+        "Etude": req.body.etude,
+        "Profession": req.body.profession,
+        "Statut": req.body.statut,
+        "Pays": req.body.pays,
+        "Ville": req.body.ville,
+        "Telephone": req.body.telephone,
+        "DateDeNaissance": req.body.dateDeNaissance,
+        "Description": req.body.description,
+        "Communication": req.body.communication,
+        "Courriel": res.account.Courriel,
+        "NumeroDeConfirmation": req.body.numeroDeConfirmation //Doit être le numero de confirmation reel.
+    })
+    try {
+        const newDemand = await demand.save();
+        res.status(201).json(newDemand);
+    } catch (err) {
+        console.error('Error saving account:', err);
+        // Handle the save error accordingly, e.g., send an error response
+        res.status(500).json({ error: 'Error saving account' });
+    }
+})
+
 //Update (patch) demands    
-router.patch('/updateDemandStatus/:id/', getDemand, async (req, res) => {
+router.patch('/updatedStatus/:id/', getDemand, async (req, res) => {
     let newDemandStatus = req.body.statutDeDemande;
     if (newDemandStatus != null) {
         try {
@@ -111,7 +136,7 @@ function getDemandsForUser(courrielCompte, openDemand) {
             if (openDemand != null) {
                 parametre = { "Courriel": courrielCompte, "StatutDeDemande": openDemand };
             }
-            demands = await Demand.find(parametre).sort({"Date": -1});
+            demands = await Demand.find(parametre).sort({ "Date": -1 });
             if (demands == null || demands.length === 0) {
                 return reject({ status: 404, message: 'Aucune demande trouvée' });
             }
@@ -130,7 +155,7 @@ function getDemandsForAdmin(openDemand) {
             var parametre = { "StatutDeDemande": openDemand };
         }
         try {
-            demands = await Demand.find(parametre).sort({"Date": -1});
+            demands = await Demand.find(parametre).sort({ "Date": -1 });
             if (demands == null || demands.length === 0) {
                 return reject({ status: 404, message: 'Aucune demande trouvée' });
             }
@@ -140,7 +165,5 @@ function getDemandsForAdmin(openDemand) {
         }
     });
 }
-
-
 
 module.exports = router
