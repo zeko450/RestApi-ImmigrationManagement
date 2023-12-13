@@ -18,6 +18,10 @@ const bugSchema = new mongoose.Schema({
     Courriel: {
         type: String
     },
+    StatutDeBug: {
+        type: Boolean,
+        default: true
+    },
     Date: {
         type: Date,
         default: Date.now
