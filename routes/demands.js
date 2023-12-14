@@ -3,9 +3,8 @@ const router = express.Router();
 const Demand = require('../models/demand')
 const Account = require('../models/account')
 
-//Les méthodes doivent être optimisées pour les usagers et les admins
 
-//GET AllDemands retournes les demandes spécifiques à l'utilisateur (Usager ou Administrateur) par ordre decroissant
+//GET AllDemands returns all demands specific to the user (User or Admin)
 router.get('/getAll/:id', getAccount, async (req, res) => {
     const account = res.account;
     const courrielCompte = account.Courriel;
@@ -23,7 +22,7 @@ router.get('/getAll/:id', getAccount, async (req, res) => {
     }
 }); 
 
-//GET demands with filter par ordre decroissant
+//GET demands with filter (open or closed) by descending order.
 router.get('/getDemandsWithFilter/:id', getAccount, async (req, res) => {
     try {
         const account = res.account;
@@ -49,6 +48,7 @@ router.get('/getDemandsWithFilter/:id', getAccount, async (req, res) => {
     }
 })
 
+<<<<<<< HEAD
 //Insert demand
 router.post('/post/:id', getAccount, async (req, res) => {
     const demand = new Demand({
@@ -77,6 +77,10 @@ router.post('/post/:id', getAccount, async (req, res) => {
 
 //Update (patch) demands    
 router.patch('/updatedStatus/:id/', getDemand, async (req, res) => {
+=======
+//Update demands status (open or closed)    
+router.patch('/updateDemandStatus/:id/', getDemand, async (req, res) => {
+>>>>>>> 1caf867dab3f1bc150be14789206ea7eb669bc58
     let newDemandStatus = req.body.statutDeDemande;
     if (newDemandStatus != null) {
         try {
@@ -94,7 +98,7 @@ router.patch('/updatedStatus/:id/', getDemand, async (req, res) => {
 //===========================================================================
 
 //Middleware Function
-//Returns one account
+//Returns one account using account id
 async function getAccount(req, res, next) {
     let account;
 
@@ -110,7 +114,7 @@ async function getAccount(req, res, next) {
     next();
 }
 
-//Returns one Demand
+//Returns one Demand using demand id
 async function getDemand(req, res, next) {
     let demand;
 
@@ -127,6 +131,7 @@ async function getDemand(req, res, next) {
 }
 // ============================================================================
 // Promise based structure 
+//  Filters and Returns demands specific to a user in descending order. 
 function getDemandsForUser(courrielCompte, openDemand) {
     return new Promise(async (resolve, reject) => {
         let demands;
@@ -147,6 +152,7 @@ function getDemandsForUser(courrielCompte, openDemand) {
     });
 }
 
+// Filters and returns demands specific to a admin in descending order.
 function getDemandsForAdmin(openDemand) {
     return new Promise(async (resolve, reject) => {
         let demands;
@@ -166,4 +172,10 @@ function getDemandsForAdmin(openDemand) {
     });
 }
 
+<<<<<<< HEAD
 module.exports = router
+=======
+
+
+module.exports = router
+>>>>>>> 1caf867dab3f1bc150be14789206ea7eb669bc58
