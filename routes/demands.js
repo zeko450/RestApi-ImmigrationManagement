@@ -48,7 +48,6 @@ router.get('/getDemandsWithFilter/:id', getAccount, async (req, res) => {
     }
 })
 
-<<<<<<< HEAD
 //Insert demand
 router.post('/post/:id', getAccount, async (req, res) => {
     const demand = new Demand({
@@ -75,12 +74,8 @@ router.post('/post/:id', getAccount, async (req, res) => {
     }
 })
 
-//Update (patch) demands    
-router.patch('/updatedStatus/:id/', getDemand, async (req, res) => {
-=======
 //Update demands status (open or closed)    
 router.patch('/updateDemandStatus/:id/', getDemand, async (req, res) => {
->>>>>>> 1caf867dab3f1bc150be14789206ea7eb669bc58
     let newDemandStatus = req.body.statutDeDemande;
     if (newDemandStatus != null) {
         try {
@@ -172,10 +167,4 @@ function getDemandsForAdmin(openDemand) {
     });
 }
 
-<<<<<<< HEAD
 module.exports = router
-=======
-
-
-module.exports = router
->>>>>>> 1caf867dab3f1bc150be14789206ea7eb669bc58
