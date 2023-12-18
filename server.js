@@ -1,5 +1,7 @@
 const express = require('express');
 const app = express();
+const cors = require("cors");
+const bodyParser = require('body-parser');
 const mongoose = require('mongoose');
 require('dotenv').config();
 
@@ -9,7 +11,10 @@ db.on('error', (error) => console.error(error));
 db.once('open', () => console.log('connected to database'));
 
 //Set server accept JSON  // accept JSON as the data format
+app.use(bodyParser.urlencoded({ extended: false }));
 app.use(express.json());
+app.use(cors());
+app.use(bodyParser.json());
 
 const accountsRouter = require('./routes/accounts');
 const adminsRouter = require('./routes/demands');
