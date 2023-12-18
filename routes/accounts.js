@@ -131,13 +131,13 @@ async function getAccount(req, res, next) {
 
 //Methode authentifie un utilisateur et retourne une booleene --fonctionnel
 async function verifyUser(req, res, next) {
-    try {
-        var rightAccount;
+    let rightAccount;
+    let passwordFound = false;
+    let userFound = false;
+    
+    try {  
         const accounts = await Account.find();
-        var passwordFound = false;
-        var userFound = false;
-        console.log(req.body.courriel);
-        console.log(req.body.password);
+
         for (let i = 0; i < accounts.length && !userFound; i++) {
             const result = await bcrypt.compare(req.body.password, accounts[i].Password)
 
