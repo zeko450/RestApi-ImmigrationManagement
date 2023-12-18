@@ -17,12 +17,18 @@ router.get('/getAll', async (req, res) => {
 });
 
 //GET verifyAccounts   ---Fonctionnel
-router.get('/verify', verifyUser, async (req, res) => {
+router.post('/verify', verifyUser, async (req, res) => {
     try {
-        res.json(res.userFound);
-    }
-    catch (err) {
-        res.status(500).json({ message: err.message })
+        if (res.userFound && res.userFound.userFound && res.account.account != null) {
+            // User is found and authenticated
+            res.status(200).json({ isAuthenticated: true, account: res.account });
+        } else {
+            // User not found or authentication failed
+            res.status(403).json({ isAuthenticated: false });
+        }
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: 'Internal Server Error' });
     }
 })
 
@@ -126,10 +132,12 @@ async function getAccount(req, res, next) {
 //Methode authentifie un utilisateur et retourne une booleene --fonctionnel
 async function verifyUser(req, res, next) {
     try {
+        var rightAccount;
         const accounts = await Account.find();
         var passwordFound = false;
         var userFound = false;
-
+        console.log(req.body.courriel);
+        console.log(req.body.password);
         for (let i = 0; i < accounts.length && !userFound; i++) {
             const result = await bcrypt.compare(req.body.password, accounts[i].Password)
 
@@ -139,6 +147,7 @@ async function verifyUser(req, res, next) {
 
             if (accounts[i].Courriel === req.body.courriel && passwordFound) {
                 userFound = true;
+                rightAccount = accounts[i];
             }
         }
 
@@ -146,10 +155,12 @@ async function verifyUser(req, res, next) {
             throw new Error('Utilisateur non trouvé')
         } else {
             res.userFound = { "userFound": userFound };
+            res.account = { "account": rightAccount }
             next();
         }
 
     } catch (err) {
+        console.log(err);
         res.status(403).send("Erreur de connexion")
     }
 }
