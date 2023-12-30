@@ -1,6 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const Account = require('../models/account')
+const nodemailer = require('nodemailer');
+require('dotenv').config();
 const bcrypt = require('bcrypt'); //Password crypter
 const saltRounds = 10; //Intensity of crypting
 
@@ -96,6 +98,16 @@ router.delete('/:id', getAccount, async (req, res) => {
     }
 })
 
+
+//Send email 
+router.post("/contact", (req, res) => {
+
+
+    
+    var url = `<a href="https://localhost:3000/"> Veuillez appuyer ici - réintialisation mot de passe </a>`
+    sendLinkToEmail("Mohamed kachach","moh-kach@hotmail.com", "Reintialiser votre mot de passe", `<p> Appuyez sur ce lien pour reinitialiser votre mot de passe <br> <br> ${url}</p>`)
+});
+
 //==========================================================================
 //Méthode crypte un mot de passe   --fonctionnel
 async function cryptPassword(plaintextPassword) {
@@ -134,8 +146,8 @@ async function verifyUser(req, res, next) {
     let rightAccount;
     let passwordFound = false;
     let userFound = false;
-    
-    try {  
+
+    try {
         const accounts = await Account.find();
 
         for (let i = 0; i < accounts.length && !userFound; i++) {
@@ -164,4 +176,40 @@ async function verifyUser(req, res, next) {
         res.status(403).send("Erreur de connexion")
     }
 }
+
+//SendEmail permet d'envoyer a un usager un courriel -- Fonctionnel 
+ function sendLinkToEmail(name,sendTo, subject, message) {
+    
+    const mail = {
+        from: name,
+        to: sendTo,
+        subject: subject,
+        html: message
+    };
+
+    const contactEmail = nodemailer.createTransport({
+        service: 'gmail',
+        auth: {
+            user: process.env.MAILSERVER_EMAIL,
+            pass: process.env.MAILSERVER_PASSWORD
+        },
+    });
+
+    contactEmail.verify((error) => {
+        if (error) {
+            console.log(error);
+        } else {
+            console.log("Ready to Send");
+        }
+    });
+
+    contactEmail.sendMail(mail, (error) => {
+        if (error) {
+            res.json(error);
+        } else {
+            res.json({ code: 200, status: "Message Sent" });
+        }
+    });
+}
+
 module.exports = router
