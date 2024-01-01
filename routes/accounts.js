@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const Account = require('../models/account')
 const nodemailer = require('nodemailer');
+const jwt = require('jsonwebtoken');
 require('dotenv').config();
 const bcrypt = require('bcrypt'); //Password crypter
 const saltRounds = 10; //Intensity of crypting
@@ -16,6 +17,11 @@ router.get('/getAll', async (req, res) => {
     catch (err) {
         res.status(500).json({ message: err.message })
     }
+});
+
+//GET oneAccountById  -- Fonctionnel
+router.get('/:id', getAccount, (req, res) => {
+    res.json(res.account);
 });
 
 //GET verifyAccounts   ---Fonctionnel
@@ -34,7 +40,7 @@ router.post('/verify', verifyUser, async (req, res) => {
     }
 })
 
-//POST addNewAccount   ---Fonctionnel  à optimiser
+//POST addNewAccount   ---Fonctionnel 
 router.post('/post', async (req, res) => {
     try {
         const plaintextPassword = req.body.password;
@@ -60,10 +66,47 @@ router.post('/post', async (req, res) => {
     };
 });
 
-//GET oneAccountById 
-router.get('/:id', getAccount, (req, res) => {
-    res.json(res.account);
-});
+//Verify if user email exists in database and send password recovery link to email.
+router.post('/getEmail', checkEmailExist, async (req, res) => {
+    let id = res.account.account._id
+    let email = res.account.account.Courriel
+    let password = res.account.account.Password
+    let name = res.account.account.Nom
+    const subject = "Reintialiser votre mot de passe";
+    let message = "";
+
+    try {
+
+        if (res.userFound && res.userFound.userFound && res.account.account != null) {
+            // Email is found 
+            res.status(200).json({ isFound: true, password: password });
+        } else {
+            // User not found or authentication failed
+            res.status(403).json({ isFound: false });
+        }
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: 'Internal Server Error' });
+    }
+
+    //Generate a unique token that last 15 minutes
+    const secret = process.env.JWT_SECRET + password;
+    const payload = {
+        email: email,
+        id: id
+    }
+
+    const token = jwt.sign(payload, secret, { expiresIn: '15m' })
+    const url = `http://localhost:3000/reinitialiserMdp/${id}/${token}`
+    message =
+        `<p> Appuyez sur ce lien pour reinitialiser votre mot de passe </p> 
+    <br> <br> 
+    <a href="${url}"> ${url} </a>`
+
+    //Send link to user email
+    sendLinkToEmail(name, email, subject, message)
+
+})
 
 //Update Password  
 router.patch('/update/:id', getAccount, async (req, res) => {
@@ -88,6 +131,7 @@ router.patch('/update/:id', getAccount, async (req, res) => {
         res.status(400).json({ error: 'New password is required for update' });
     }
 });
+
 //Delete oneAccount
 router.delete('/:id', getAccount, async (req, res) => {
     try {
@@ -98,15 +142,6 @@ router.delete('/:id', getAccount, async (req, res) => {
     }
 })
 
-
-//Send email 
-router.post("/contact", (req, res) => {
-
-
-    
-    var url = `<a href="https://localhost:3000/"> Veuillez appuyer ici - réintialisation mot de passe </a>`
-    sendLinkToEmail("Mohamed kachach","moh-kach@hotmail.com", "Reintialiser votre mot de passe", `<p> Appuyez sur ce lien pour reinitialiser votre mot de passe <br> <br> ${url}</p>`)
-});
 
 //==========================================================================
 //Méthode crypte un mot de passe   --fonctionnel
@@ -177,9 +212,36 @@ async function verifyUser(req, res, next) {
     }
 }
 
+//Verify email exist 
+async function checkEmailExist(req, res, next) {
+    let rightAccount;
+    let userFound = false;
+    try {
+        const accounts = await Account.find();
+        for (let i = 0; i < accounts.length && !userFound; i++) {
+            if (accounts[i].Courriel === req.body.email) {
+                userFound = true;
+                rightAccount = accounts[i]
+                console.log(userFound);
+            }
+        }
+        if (!userFound) {
+            throw new Error("Ce compte n'existe pas")
+        } else {
+            res.userFound = { "userFound": userFound };
+            res.account = { "account": rightAccount }
+            next();
+        }
+    } catch (err) {
+        console.log("err" + userFound);
+        console.log(err);
+        res.status(403).send("Erreur de connexion")
+    }
+}
+
 //SendEmail permet d'envoyer a un usager un courriel -- Fonctionnel 
- function sendLinkToEmail(name,sendTo, subject, message) {
-    
+function sendLinkToEmail(name, sendTo, subject, message) {
+
     const mail = {
         from: name,
         to: sendTo,
