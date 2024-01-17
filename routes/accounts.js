@@ -6,12 +6,14 @@ const jwt = require('jsonwebtoken');
 require('dotenv').config();
 const bcrypt = require('bcrypt'); //Password crypter
 const saltRounds = 10; //Intensity of crypting
+const { validationResult } = require('express-validator');
+
 
 
 //GET Accounts    ---Fonctionnel
 router.get('/getAll', async (req, res) => {
     try {
-        const accounts = await Account.find();
+        const accounts = await fetchAccounts();
         res.json(accounts);
     }
     catch (err) {
@@ -28,6 +30,7 @@ router.get('/:id', getAccount, (req, res) => {
 router.post('/verify', verifyUser, async (req, res) => {
     try {
         if (res.userFound && res.userFound.userFound && res.account.account != null) {
+
             // User is found and authenticated
             res.status(200).json({ isAuthenticated: true, account: res.account });
         } else {
@@ -43,6 +46,15 @@ router.post('/verify', verifyUser, async (req, res) => {
 //POST addNewAccount   ---Fonctionnel 
 router.post('/post', async (req, res) => {
     try {
+
+        // Input validation 
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+            return res.status(400).json({ error: 'Validation failed', details: errors.array() });
+        }
+
+        //Separate validation logic from main route handler
+
         const plaintextPassword = req.body.password;
 
         const hashkey = await cryptPassword(plaintextPassword);
@@ -66,7 +78,7 @@ router.post('/post', async (req, res) => {
     };
 });
 
-//Verify if user email exists in database and send password recovery link to email.
+//Verify le courriel saisi et envoie un courriel a celui-ci -- Fonctionnel
 router.post('/getEmail', checkEmailExist, async (req, res) => {
     let id = res.account.account._id
     let email = res.account.account.Courriel
@@ -76,7 +88,6 @@ router.post('/getEmail', checkEmailExist, async (req, res) => {
     let message = "";
 
     try {
-
         if (res.userFound && res.userFound.userFound && res.account.account != null) {
             // Email is found 
             res.status(200).json({ isFound: true, password: password });
@@ -97,7 +108,7 @@ router.post('/getEmail', checkEmailExist, async (req, res) => {
     }
 
     const token = jwt.sign(payload, secret, { expiresIn: '15m' })
-    const url = `http://localhost:3000/reinitialiserMdp/${id}/${token}`
+    const url = `http://localhost:4200/reinitialisation/nouveau/${id}`
     message =
         `<p> Appuyez sur ce lien pour reinitialiser votre mot de passe </p> 
     <br> <br> 
@@ -108,14 +119,34 @@ router.post('/getEmail', checkEmailExist, async (req, res) => {
 
 })
 
-//Update Password  
-router.patch('/update/:id', getAccount, async (req, res) => {
-    const plainText = req.body.password
 
-    if (req.body.password != null) {
+router.get('/reset-password/:id/:token', getAccount, async (req, res) => {
+    const { id, token } = req.params;
+
+    //Check if id exist in database
+    if (id != res.account._id) {
+        res.send('Invalid id');
+    }
+
+    // we have a valid id and valid user with this id
+    const secret = process.env.JWT_SECRET + res.account.Password;
+    try {
+        const payload = jwt.verify(token, secret);
+        res.status(200).json({ isTrue: true, courriel: res.account.Courriel })
+
+    } catch (err) {
+        console.log(err.message);
+        res.send(err.message);
+    }
+})
+
+//Update Password -- Fonctionnel  
+router.patch('/update/:id', getAccount, async (req, res) => {
+    const newPlainTextPassword = req.body.password
+    if (newPlainTextPassword != null) {
         try {
             //Hash the new password
-            const hashkey = await cryptPassword(plainText)
+            const hashkey = await cryptPassword(newPlainTextPassword)
 
             res.account.Password = hashkey;
 
@@ -132,7 +163,7 @@ router.patch('/update/:id', getAccount, async (req, res) => {
     }
 });
 
-//Delete oneAccount
+//Delete oneAccount -- Fonctionnel.
 router.delete('/:id', getAccount, async (req, res) => {
     try {
         await res.account.deleteOne();
@@ -144,100 +175,6 @@ router.delete('/:id', getAccount, async (req, res) => {
 
 
 //==========================================================================
-//Méthode crypte un mot de passe   --fonctionnel
-async function cryptPassword(plaintextPassword) {
-    return new Promise((resolve, reject) => {
-        bcrypt.hash(plaintextPassword, saltRounds, function (err, hash) {
-            if (err) {
-                console.error('Error hashing password:', err);
-                reject(err);
-            } else {
-                // Store the 'hash' in your database
-                resolve(hash);
-            }
-        });
-    });
-}
-
-//============================================================================
-//Middleware function 
-//Méthode retourne un compte  --fonctionnel
-async function getAccount(req, res, next) {
-    let account;
-    try {
-        account = await Account.findById(req.params.id)
-        if (account == null) {
-            return res.status(404).json({ message: 'Compte introuvable' })
-        }
-    } catch (err) {
-        return res.status(500).json({ message: err.message })
-    }
-    res.account = account;
-    next();
-}
-
-//Methode authentifie un utilisateur et retourne une booleene --fonctionnel
-async function verifyUser(req, res, next) {
-    let rightAccount;
-    let passwordFound = false;
-    let userFound = false;
-
-    try {
-        const accounts = await Account.find();
-
-        for (let i = 0; i < accounts.length && !userFound; i++) {
-            const result = await bcrypt.compare(req.body.password, accounts[i].Password)
-
-            if (result) {
-                passwordFound = true;
-            }
-
-            if (accounts[i].Courriel === req.body.courriel && passwordFound) {
-                userFound = true;
-                rightAccount = accounts[i];
-            }
-        }
-
-        if (!userFound) {
-            throw new Error('Utilisateur non trouvé')
-        } else {
-            res.userFound = { "userFound": userFound };
-            res.account = { "account": rightAccount }
-            next();
-        }
-
-    } catch (err) {
-        console.log(err);
-        res.status(403).send("Erreur de connexion")
-    }
-}
-
-//Verify email exist 
-async function checkEmailExist(req, res, next) {
-    let rightAccount;
-    let userFound = false;
-    try {
-        const accounts = await Account.find();
-        for (let i = 0; i < accounts.length && !userFound; i++) {
-            if (accounts[i].Courriel === req.body.email) {
-                userFound = true;
-                rightAccount = accounts[i]
-                console.log(userFound);
-            }
-        }
-        if (!userFound) {
-            throw new Error("Ce compte n'existe pas")
-        } else {
-            res.userFound = { "userFound": userFound };
-            res.account = { "account": rightAccount }
-            next();
-        }
-    } catch (err) {
-        console.log("err" + userFound);
-        console.log(err);
-        res.status(403).send("Erreur de connexion")
-    }
-}
 
 //SendEmail permet d'envoyer a un usager un courriel -- Fonctionnel 
 function sendLinkToEmail(name, sendTo, subject, message) {
@@ -272,6 +209,123 @@ function sendLinkToEmail(name, sendTo, subject, message) {
             res.json({ code: 200, status: "Message Sent" });
         }
     });
+}
+
+//Méthode crypte un mot de passe   --fonctionnel
+async function cryptPassword(plaintextPassword) {
+    return new Promise((resolve, reject) => {
+        bcrypt.hash(plaintextPassword, saltRounds, function (err, hash) {
+            if (err) {
+                console.error('Error hashing password:', err);
+                reject(new Error('Error hashing password'));
+            } else {
+                // Store the 'hash's in your database
+                resolve(hash);
+            }
+        });
+    });
+}
+
+//Méthode retourne un compte  --fonctionnel
+async function getAccount(req, res, next) {
+    let account;
+    try {
+        account = await fetchAccountById(req.params.id);
+        if (account == null) {
+            return res.status(404).json({ message: 'Compte introuvable' })
+        }
+    } catch (err) {
+        return res.status(500).json({ message: err.message })
+    }
+    res.account = account;
+    next();
+}
+
+//Methode authentifie un utilisateur et retourne une booleene --fonctionnel
+async function verifyUser(req, res, next) {
+    let rightAccount;
+    let userFound = false;
+
+    try {
+        const accounts = await fetchAccounts();
+
+        for (let i = 0; i < accounts.length && !userFound; i++) {
+            // Use bcrypt.compare to compare the entered password with the hashed password
+            const isPasswordMatch = await comparePasswords(req.body.password, accounts[i].Password);
+
+            if (req.body.courriel === accounts[i].Courriel && isPasswordMatch) {
+                userFound = true;
+                rightAccount = accounts[i];
+            }
+        }
+
+        if (!userFound) {
+            throw new Error('Utilisateur non trouvé');
+        } else {
+            res.userFound = { "userFound": userFound };
+            res.account = { "account": rightAccount };
+            next();
+        }
+
+    } catch (err) {
+        console.error(err);
+        res.status(404).send("L'utilisateur n'existe pas");
+    }
+
+}
+
+//Verify si un courriel existe 
+async function checkEmailExist(req, res, next) {
+    let rightAccount;
+    let userFound = false;
+    try {
+        const accounts = await fetchAccounts();
+        for (let i = 0; i < accounts.length && !userFound; i++) {
+            if (accounts[i].Courriel === req.body.email) {
+                userFound = true;
+                rightAccount = accounts[i]
+                console.log(userFound);
+            }
+        }
+        if (!userFound) {
+            throw new Error("Ce compte n'existe pas")
+        } else {
+            res.userFound = { "userFound": userFound };
+            res.account = { "account": rightAccount }
+            next();
+        }
+    } catch (err) {
+        console.log("err" + userFound);
+        console.log(err);
+        res.status(403).send("Erreur de connexion")
+    }
+}
+
+//Retourne la liste de compte
+async function fetchAccounts() {
+    // Logic to fetch accounts from the database
+    try {
+        // Logic to fetch accounts from the database
+        return await Account.find();
+    } catch (error) {
+        console.error("Error fetching accounts:", error);
+        throw new Error("Error fetching accounts");
+    }
+}
+
+//Compare le mot de passe saisie et le mot de passe stocké dans la base de donnée
+async function comparePasswords(enteredPassword, storedPassword) {
+    return await bcrypt.compare(enteredPassword, storedPassword);
+}
+
+//Retourne un compte en fonction de l'id fournis.
+async function fetchAccountById(params) {
+    try {
+        return await Account.findById(params);
+    } catch (error) {
+        console.error("Error fetching account:", error);
+        throw new Error("Error fetching account");
+    }
 }
 
 module.exports = router

@@ -17,10 +17,11 @@ router.get('/getAll/:id', getAccount, async (req, res) => {
         } else if (account.TypeDeCompte == "admin") {
             demands = await getDemandsForAdmin(openDemand);
         }
+        res.json(demands);
     } catch (err) {
         res.status(err.status || 500).json({ message: err.message });
     }
-}); 
+});
 
 //GET demands with filter (open or closed) by descending order.
 router.get('/getDemandsWithFilter/:id', getAccount, async (req, res) => {
@@ -68,9 +69,9 @@ router.post('/post/:id', getAccount, async (req, res) => {
         const newDemand = await demand.save();
         res.status(201).json(newDemand);
     } catch (err) {
-        console.error('Error saving account:', err);
+        console.error('Error saving demand:', err);
         // Handle the save error accordingly, e.g., send an error response
-        res.status(500).json({ error: 'Error saving account' });
+        res.status(500).json({ error: 'Error saving demand' });
     }
 })
 
@@ -90,9 +91,12 @@ router.patch('/updateDemandStatus/:id/', getDemand, async (req, res) => {
     }
 })
 
+
+
 //===========================================================================
 
-//Middleware Function
+
+//Middleware Functions
 //Returns one account using account id
 async function getAccount(req, res, next) {
     let account;
@@ -124,8 +128,10 @@ async function getDemand(req, res, next) {
     res.demand = demand;
     next();
 }
-// ============================================================================
-// Promise based structure 
+
+
+
+// Promise based structures 
 //  Filters and Returns demands specific to a user in descending order. 
 function getDemandsForUser(courrielCompte, openDemand) {
     return new Promise(async (resolve, reject) => {
@@ -138,7 +144,7 @@ function getDemandsForUser(courrielCompte, openDemand) {
             }
             demands = await Demand.find(parametre).sort({ "Date": -1 });
             if (demands == null || demands.length === 0) {
-                return reject({ status: 404, message: 'Aucune demande trouvée' });
+                return reject({ status: 200, message: 'Aucune demande trouvée' });
             }
             resolve(demands);
         } catch (err) {
