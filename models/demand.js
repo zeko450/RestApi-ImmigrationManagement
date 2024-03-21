@@ -1,12 +1,10 @@
-const mongoose = require('mongoose')
+const mongoose = require('mongoose');
 
 const demandSchema = new mongoose.Schema({
 
     NumeroDeDemande: {
         type: Number,
         required: true,
-        startAt: 1,
-        incrementBy: 1,
         unique: true
     },
     Etude: {
