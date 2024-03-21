@@ -1,17 +1,27 @@
 const express = require('express');
 const router = express.Router();
-const Demand = require('../models/demand')
-const Account = require('../models/account')
-
+const Demand = require('../models/demand');
+const Account = require('../models/account');
+const jwt = require('jsonwebtoken');
+const nodemailer = require('nodemailer');
 
 //GET AllDemands returns all demands specific to the user (User or Admin)
-router.get('/getAll/:id', getAccount, async (req, res) => {
+router.get('/getAll/:id/:token', getAccount, async (req, res) => {
     const account = res.account;
     const courrielCompte = account.Courriel;
     let demands;
     let openDemand;
 
+    const { id, token } = req.params;
+
+    if (id != res.account._id) {
+        res.send('Invalid id');
+    }
+
+    const secret = process.env.JWT_SECRET + res.account.Password;
+
     try {
+        jwt.verify(token, secret);
         if (account.TypeDeCompte == "usager") {
             demands = await getDemandsForUser(courrielCompte, openDemand);
         } else if (account.TypeDeCompte == "admin") {
@@ -19,9 +29,15 @@ router.get('/getAll/:id', getAccount, async (req, res) => {
         }
         res.json(demands);
     } catch (err) {
+        console.error(err);
         res.status(err.status || 500).json({ message: err.message });
     }
 });
+
+//Get OneDemand with id
+router.get('/getDemandById/:demandNumber/:id/:token', getDemand, async (req, res) => {
+    res.json(res.demand);
+})
 
 //GET demands with filter (open or closed) by descending order.
 router.get('/getDemandsWithFilter/:id', getAccount, async (req, res) => {
@@ -50,23 +66,57 @@ router.get('/getDemandsWithFilter/:id', getAccount, async (req, res) => {
 })
 
 //Insert demand
-router.post('/post/:id', getAccount, async (req, res) => {
+router.post('/post/:id/:token', getAccount, async (req, res) => {
+
+    const lastDemandId = await getLastDemandNumber();
     const demand = new Demand({
-        "NumeroDeDemande": req.body.numeroDeDemande, //Doit etre auto incrementes
+        "NumeroDeDemande": lastDemandId + 1, //Doit etre auto incrementes
         "Etude": req.body.etude,
         "Profession": req.body.profession,
         "Statut": req.body.statut,
         "Pays": req.body.pays,
         "Ville": req.body.ville,
         "Telephone": req.body.telephone,
-        "DateDeNaissance": req.body.dateDeNaissance,
+        "DateDeNaissance": req.body.dateNaissance,
         "Description": req.body.description,
         "Communication": req.body.communication,
         "Courriel": res.account.Courriel,
-        "NumeroDeConfirmation": req.body.numeroDeConfirmation //Doit être le numero de confirmation reel.
+        "NumeroDeConfirmation": lastDemandId + 1
+        // "NumeroDeConfirmation": req.body.numeroDeConfirmation //Doit être le numero de confirmation reel.
     })
+
     try {
+        //token verification 
+        const { id, token } = req.params;
+        if (id != res.account._id) {
+            res.send('Invalid id');
+        }
+
+        const secret = process.env.JWT_SECRET + res.account.Password;
+        jwt.verify(token, secret);
+
+        //Adding demand to databse
         const newDemand = await demand.save();
+
+        //Notify admin with mail
+        const name = res.account.Nom + " " + res.account.Prenom;
+        const email = process.env.ADMIN_EMAIL;
+        const subject = "Nouvelle demande de consultation";
+        const message =
+            `<p>NumeroDeDemande: ${lastDemandId} <br> 
+            Etude: ${req.body.etude} <br>  
+            Profession: ${req.body.profession} <br>  
+            Statut: ${req.body.statut} <br>  
+            Pays: ${req.body.pays} <br>  
+            Ville: ${req.body.ville} <br>  
+            Telephone: ${req.body.telephone} <br>  
+            DateDeNaissance: ${req.body.dateNaissance} <br>  
+            Description: ${req.body.description} <br>  
+            Communication: ${req.body.communication} <br>  
+            Courriel: ${res.account.Courriel} <br> 
+            </p>`;
+        //  "NumeroDeConfirmation: " `${req.body.numeroDeConfirmation}`  //Doit être le numero de confirmation reel.;
+        sendEmail(name, email, subject, message);
         res.status(201).json(newDemand);
     } catch (err) {
         console.error('Error saving demand:', err);
@@ -90,7 +140,6 @@ router.patch('/updateDemandStatus/:id/', getDemand, async (req, res) => {
         }
     }
 })
-
 
 
 //===========================================================================
@@ -118,7 +167,7 @@ async function getDemand(req, res, next) {
     let demand;
 
     try {
-        demand = await Demand.findById(req.params.id)
+        demand = await Demand.find({NumeroDeDemande: req.params.demandNumber})
         if (demand == null) {
             return res.status(404).json({ message: 'demande introuvable' })
         }
@@ -129,7 +178,24 @@ async function getDemand(req, res, next) {
     next();
 }
 
-
+//Returns last demandNumber inserted in database
+function getLastDemandNumber() {
+    return new Promise(async (resolve, reject) => {
+        let lastDemandId;
+        try {
+            const lastDemand = await Demand.find({}, { NumeroDeDemande: 1, _id: 0 }).sort({ NumeroDeDemande: -1 }).limit(1);
+            if (lastDemand.length === 0) {
+                lastDemandId = 0;
+            } else {
+                lastDemandId = lastDemand[0].NumeroDeDemande;
+                console.log(lastDemandId);
+            }
+            resolve(lastDemandId);
+        } catch (err) {
+            reject({ status: 500, message: err.message });
+        }
+    });
+}
 
 // Promise based structures 
 //  Filters and Returns demands specific to a user in descending order. 
@@ -172,5 +238,41 @@ function getDemandsForAdmin(openDemand) {
         }
     });
 }
+
+// Fonction permettant l'envoie de courriel
+function sendEmail(name, sendTo, subject, message) {
+
+    const mail = {
+        from: name,
+        to: sendTo,
+        subject: subject,
+        html: message
+    };
+
+    const contactEmail = nodemailer.createTransport({
+        service: 'gmail',
+        auth: {
+            user: process.env.MAILSERVER_EMAIL,
+            pass: process.env.MAILSERVER_PASSWORD
+        },
+    });
+
+    contactEmail.verify((error) => {
+        if (error) {
+            console.log(error);
+        } else {
+            console.log("Ready to Send");
+        }
+    });
+
+    contactEmail.sendMail(mail, (error) => {
+        if (error) {
+            res.json(error);
+        } else {
+            res.json({ code: 200, status: "Message Sent" });
+        }
+    });
+}
+
 
 module.exports = router
