@@ -8,8 +8,6 @@ const bcrypt = require('bcrypt'); //Password crypter
 const saltRounds = 10; //Intensity of crypting
 const { validationResult } = require('express-validator');
 
-
-
 //GET Accounts    ---Fonctionnel
 router.get('/getAll', async (req, res) => {
     try {
@@ -28,11 +26,23 @@ router.get('/:id', getAccount, (req, res) => {
 
 //GET verifyAccounts   ---Fonctionnel
 router.post('/verify', verifyUser, async (req, res) => {
+    const email = res.account.account.Courriel;
+    const id = res.account.account._id;
+    const password = res.account.account.Password;
+    
     try {
         if (res.userFound && res.userFound.userFound && res.account.account != null) {
 
+            //Generate a unique token that last 60 min
+            const secret = process.env.JWT_SECRET + password;
+            const payload = {
+                email: email,
+                id: id
+            }
+
+            const token = jwt.sign(payload, secret, { expiresIn: '60m' })
             // User is found and authenticated
-            res.status(200).json({ isAuthenticated: true, account: res.account });
+            res.status(200).json({ isAuthenticated: true, account: res.account, token: token });
         } else {
             // User not found or authentication failed
             res.status(403).json({ isAuthenticated: false });
@@ -108,18 +118,18 @@ router.post('/getEmail', checkEmailExist, async (req, res) => {
     }
 
     const token = jwt.sign(payload, secret, { expiresIn: '15m' })
-    const url = `http://localhost:4200/reinitialisation/nouveau/${id}`
+    //const url = `http://localhost:4200/reinitialisation/nouveau/${id}`
+    const url = `http://localhost:4200/reset-password/${id}/${token}`;
     message =
         `<p> Appuyez sur ce lien pour reinitialiser votre mot de passe </p> 
     <br> <br> 
     <a href="${url}"> ${url} </a>`
 
     //Send link to user email
-    sendLinkToEmail(name, email, subject, message)
-
+    sendEmail(name, email, subject, message)
 })
 
-
+//Redirection vers la page de reinitiliation -- Fonctionnel
 router.get('/reset-password/:id/:token', getAccount, async (req, res) => {
     const { id, token } = req.params;
 
@@ -131,17 +141,41 @@ router.get('/reset-password/:id/:token', getAccount, async (req, res) => {
     // we have a valid id and valid user with this id
     const secret = process.env.JWT_SECRET + res.account.Password;
     try {
+        console.log("Before verify")
         const payload = jwt.verify(token, secret);
-        res.status(200).json({ isTrue: true, courriel: res.account.Courriel })
+        console.log("After verify")
+        res.status(200).json({ isAllowed: true, courriel: res.account.Courriel })
 
     } catch (err) {
-        console.log(err.message);
-        res.send(err.message);
+        res.status(999).json({ isAllowed: false });
+        //console.log(err.message);
     }
 })
 
 //Update Password -- Fonctionnel  
-router.patch('/update/:id', getAccount, async (req, res) => {
+/* router.patch('/update/:id', getAccount, async (req, res) => {
+    const newPlainTextPassword = req.body.password
+    if (newPlainTextPassword != null) {
+        try {
+            //Hash the new password
+            const hashkey = await cryptPassword(newPlainTextPassword)
+
+            res.account.Password = hashkey;
+
+            const updatedAccount = await res.account.save()
+            res.json(updatedAccount)
+
+        } catch (err) {
+            console.error('Error updating account password:', error);
+            res.status(500).json({ error: 'Error updating account password' });
+        }
+    } else {
+        // Handle case where req.body.Password is null
+        res.status(400).json({ error: 'New password is required for update' });
+    }
+}); */
+
+router.post('/reset-password/:id/:token', getAccount, async (req, res) => {
     const newPlainTextPassword = req.body.password
     if (newPlainTextPassword != null) {
         try {
@@ -171,45 +205,13 @@ router.delete('/:id', getAccount, async (req, res) => {
     } catch (err) {
         res.status(500).json({ message: err.message })
     }
-})
+});
 
-
+router.get('/logout', async (req, res) => {
+    jwt.sign('', {expiresIn: '1'});
+});
 //==========================================================================
-
-//SendEmail permet d'envoyer a un usager un courriel -- Fonctionnel 
-function sendLinkToEmail(name, sendTo, subject, message) {
-
-    const mail = {
-        from: name,
-        to: sendTo,
-        subject: subject,
-        html: message
-    };
-
-    const contactEmail = nodemailer.createTransport({
-        service: 'gmail',
-        auth: {
-            user: process.env.MAILSERVER_EMAIL,
-            pass: process.env.MAILSERVER_PASSWORD
-        },
-    });
-
-    contactEmail.verify((error) => {
-        if (error) {
-            console.log(error);
-        } else {
-            console.log("Ready to Send");
-        }
-    });
-
-    contactEmail.sendMail(mail, (error) => {
-        if (error) {
-            res.json(error);
-        } else {
-            res.json({ code: 200, status: "Message Sent" });
-        }
-    });
-}
+ 
 
 //Méthode crypte un mot de passe   --fonctionnel
 async function cryptPassword(plaintextPassword) {
@@ -326,6 +328,41 @@ async function fetchAccountById(params) {
         console.error("Error fetching account:", error);
         throw new Error("Error fetching account");
     }
+}
+
+//Fonction permettant l'envoie de courriel.
+function sendEmail(name, sendTo, subject, message) {
+
+    const mail = {
+        from: name,
+        to: sendTo,
+        subject: subject,
+        html: message
+    };
+
+    const contactEmail = nodemailer.createTransport({
+        service: 'gmail',
+        auth: {
+            user: process.env.MAILSERVER_EMAIL,
+            pass: process.env.MAILSERVER_PASSWORD
+        },
+    });
+
+    contactEmail.verify((error) => {
+        if (error) {
+            console.log(error);
+        } else {
+            console.log("Ready to Send");
+        }
+    });
+
+    contactEmail.sendMail(mail, (error) => {
+        if (error) {
+            res.json(error);
+        } else {
+            res.json({ code: 200, status: "Message Sent" });
+        }
+    });
 }
 
 module.exports = router
